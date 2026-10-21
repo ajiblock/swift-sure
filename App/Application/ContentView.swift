@@ -105,7 +105,7 @@ struct ContentView: View {
           transactionHistoryStoreFactory: transactionHistoryStoreFactory
         )
         .id(connection.sessionGeneration)
-        .sectionSwipe(.overview, drag: sectionDrag, arrival: sectionArrival)
+        .sectionSwipe(.overview, drag: sectionDrag, arrival: sectionArrival, width: sectionWidth)
       }
 
       Tab("Assistant", systemImage: "sparkles", value: .assistant) {
@@ -117,7 +117,7 @@ struct ContentView: View {
           now: now
         )
         .id(connection.sessionGeneration)
-        .sectionSwipe(.assistant, drag: sectionDrag, arrival: sectionArrival)
+        .sectionSwipe(.assistant, drag: sectionDrag, arrival: sectionArrival, width: sectionWidth)
       }
 
       Tab("Accounts", systemImage: "building.columns.fill", value: .accounts) {
@@ -129,13 +129,13 @@ struct ContentView: View {
           localTransactionHistoryStoreFactory: localTransactionHistoryStoreFactory
         )
         .id(connection.sessionGeneration)
-        .sectionSwipe(.accounts, drag: sectionDrag, arrival: sectionArrival)
+        .sectionSwipe(.accounts, drag: sectionDrag, arrival: sectionArrival, width: sectionWidth)
       }
 
       Tab("Budget", systemImage: "chart.pie.fill", value: .budget) {
         BudgetView(data: financeData, hasSyncAccess: hasBackendAccess)
           .id(connection.sessionGeneration)
-          .sectionSwipe(.budget, drag: sectionDrag, arrival: sectionArrival)
+          .sectionSwipe(.budget, drag: sectionDrag, arrival: sectionArrival, width: sectionWidth)
       }
     }
     .tabViewStyle(.sidebarAdaptable)
@@ -216,10 +216,19 @@ private struct SectionSwipePresentation: ViewModifier {
   var section: AppSection
   var drag: SectionDrag
   var arrival: SectionArrival?
+  var width: CGFloat
 
   func body(content: Content) -> some View {
     let start = arrival.flatMap { $0.section == section ? $0.start : nil } ?? .settled
     content
+      .background {
+        // Nothing sits behind a tab's content, so the strip it uncovers would
+        // show the window, which is black in dark mode. A backdrop waits just
+        // off each side and moves with the content, so it also covers the
+        // strip while a released swipe springs back.
+        SectionSwipeBackdrop().offset(x: -width)
+        SectionSwipeBackdrop().offset(x: width)
+      }
       .offset(x: drag.section == section ? drag.offset : 0)
       .keyframeAnimator(initialValue: SectionArrival.Frame.settled, trigger: arrival) { content, frame in
         content
@@ -238,9 +247,19 @@ private struct SectionSwipePresentation: ViewModifier {
   }
 }
 
+/// The canvas every section paints behind its content, for the strip a swipe uncovers.
+private struct SectionSwipeBackdrop: View {
+  var body: some View {
+    SureTheme.canvas.opacity(0.65)
+      .background(.background)
+      .ignoresSafeArea()
+      .allowsHitTesting(false)
+  }
+}
+
 private extension View {
-  func sectionSwipe(_ section: AppSection, drag: SectionDrag, arrival: SectionArrival?) -> some View {
-    modifier(SectionSwipePresentation(section: section, drag: drag, arrival: arrival))
+  func sectionSwipe(_ section: AppSection, drag: SectionDrag, arrival: SectionArrival?, width: CGFloat) -> some View {
+    modifier(SectionSwipePresentation(section: section, drag: drag, arrival: arrival, width: width))
   }
 }
 
